@@ -24,6 +24,8 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highcharts/11.4.0/highcharts.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highcharts/11.4.0/highcharts-3d.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highcharts/11.4.0/modules/heatmap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highcharts/11.4.0/modules/exporting.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
@@ -68,6 +70,13 @@
             .print-page-break { page-break-before: always; }
             #app, #void-wrapper, #custom-dash-wrapper { padding: 0 !important; max-width: 100% !important; }
         }
+
+        /* === CSS สำหรับ Hourly Report (Tab 5) === */
+        .highcharts-credits { display: none !important; }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
     </style>
 </head>
 <body>
@@ -107,12 +116,15 @@
                 <button id="btn-custom-dash" onclick="switchGlobalTab('custom-dash')" class="border-transparent text-gray-500 hover:text-purple-600 hover:border-purple-300 whitespace-nowrap py-4 px-1 border-b-2 font-bold text-base flex items-center gap-2 transition-colors">
                     <i class="fas fa-images"></i> Custom Dashboard
                 </button>
+                <button id="btn-hourly" onclick="switchGlobalTab('hourly')" class="border-transparent text-gray-500 hover:text-pink-600 hover:border-pink-300 whitespace-nowrap py-4 px-1 border-b-2 font-bold text-base flex items-center gap-2 transition-colors">
+                    <i class="fas fa-clock"></i> Hourly Report
+                </button>
             </div>
             
             <!-- Global Branch Filter -->
-            <div class="ml-4 flex items-center bg-gray-50 px-3 py-2 rounded-lg border border-gray-200 shadow-sm min-w-max hidden" id="globalBranchFilterContainer">
-                <label for="globalBranchSelect" class="mr-2 text-sm font-bold text-gray-700"><i class="fas fa-store text-orange-500 mr-1"></i> สาขา:</label>
-                <select id="globalBranchSelect" onchange="changeGlobalBranch(this.value)" class="bg-white border border-gray-300 rounded-md px-2 py-1 text-sm font-semibold text-gray-800 outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 cursor-pointer min-w-[150px]">
+            <div class="ml-4 flex items-center bg-gray-50 px-3 py-2 rounded-lg border border-gray-200 shadow-sm shrink-0 hidden" id="globalBranchFilterContainer">
+                <label for="globalBranchSelect" class="mr-2 text-sm font-bold text-gray-700 whitespace-nowrap"><i class="fas fa-store text-orange-500 mr-1"></i> สาขา:</label>
+                <select id="globalBranchSelect" onchange="changeGlobalBranch(this.value)" class="bg-white border border-gray-300 rounded-md px-2 py-1 text-sm font-semibold text-gray-800 outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 cursor-pointer w-32 sm:w-48 md:w-64 truncate">
                     <option value="รวมทุกสาขา">รวมทุกสาขา</option>
                 </select>
             </div>
@@ -475,7 +487,6 @@
                         <table class="min-w-full text-left text-sm whitespace-nowrap">
                             <thead class="bg-themeBlack text-white uppercase">
                                 <tr>
-                                    <th class="px-6 py-4 font-semibold text-themeOrange">สาขา</th>
                                     <th class="px-6 py-4 font-semibold text-themeOrange">วันที่เปิดบิล</th>
                                     <th class="px-6 py-4 font-semibold text-themeOrange">ยกเลิกโดย</th>
                                     <th class="px-6 py-4 font-semibold text-themeOrange">เวลาที่ยกเลิก</th>
@@ -484,15 +495,17 @@
                                     <th class="px-6 py-4 font-semibold text-center border-l border-gray-700">Cancel</th>
                                     <th class="px-6 py-4 font-semibold text-center border-l border-gray-700">Void</th>
                                     <th class="px-6 py-4 font-semibold text-right border-l border-gray-700 text-red-400">มูลค่า (บาท)</th>
+                                    <th class="px-6 py-4 font-semibold text-themeOrange border-l border-gray-700 text-center">สาขา</th>
                                 </tr>
                             </thead>
                             <tbody id="voidPivotTableBody" class="bg-white"></tbody>
                             <tfoot class="bg-gray-100 font-bold text-themeBlack border-t-[3px] border-themeBlack">
                                 <tr>
-                                    <td class="px-6 py-4 text-right uppercase" colspan="6">Grand Total</td>
+                                    <td class="px-6 py-4 text-right uppercase" colspan="5">Grand Total</td>
                                     <td class="px-6 py-4 text-center border-l border-gray-300" id="voidFootCancelTotal">0</td>
                                     <td class="px-6 py-4 text-center border-l border-gray-300" id="voidFootVoidTotal">0</td>
                                     <td class="px-6 py-4 text-right border-l border-gray-300 text-red-600" id="voidFootValueTotal">0.00</td>
+                                    <td class="px-6 py-4 border-l border-gray-300"></td>
                                 </tr>
                             </tfoot>
                         </table>
@@ -562,6 +575,93 @@
 
         <div id="customDashToast" class="fixed bottom-5 right-5 bg-black text-white px-6 py-3 rounded-lg shadow-lg opacity-0 transition-opacity duration-300 pointer-events-none z-50">
             กรุณาอัปโหลดไฟล์รูปภาพเท่านั้น!
+        </div>
+    </div>
+
+    <!-- ================= APP 5: HOURLY REPORT ================= -->
+    <div id="hourly-wrapper" class="hidden relative p-4 md:p-8">
+        <div class="max-w-7xl mx-auto">
+            <div class="bg-white p-6 rounded-2xl shadow-sm border-l-4 border-themeOrange mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-800 flex items-center">
+                        <div class="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center mr-3 shrink-0"><i class="fas fa-fire text-themeOrange"></i></div>
+                        Hourly Sales Analytics
+                    </h1>
+                    <p class="text-sm text-gray-500 mt-1 ml-14">วิเคราะห์พฤติกรรมการซื้อรายชั่วโมง และหมวดหมู่ที่ทำเงินสูงสุด</p>
+                </div>
+                <div class="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
+                    <div class="flex items-center bg-gray-50 px-3 py-2 rounded-lg border border-gray-200 shadow-sm w-full sm:w-auto hidden" id="localMonthFilterContainer">
+                        <label class="mr-2 text-sm font-bold text-gray-700"><i class="fas fa-calendar-alt text-blue-500 mr-1"></i> เดือน:</label>
+                        <select id="localMonthSelect" onchange="handleLocalMonthChange(this.value)" class="bg-white border border-gray-300 rounded-md px-2 py-1 text-sm font-semibold text-gray-800 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 cursor-pointer min-w-[150px]"></select>
+                    </div>
+                    <div class="flex items-center bg-gray-50 px-3 py-2 rounded-lg border border-gray-200 shadow-sm w-full sm:w-auto hidden" id="localBranchFilterContainer">
+                        <label class="mr-2 text-sm font-bold text-gray-700"><i class="fas fa-store text-orange-500 mr-1"></i> สาขา:</label>
+                        <select id="localBranchSelect" onchange="handleLocalBranchChange(this.value)" class="bg-white border border-gray-300 rounded-md px-2 py-1 text-sm font-semibold text-gray-800 outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 cursor-pointer min-w-[150px]"><option value="รวมทุกสาขา">รวมทุกสาขา</option></select>
+                    </div>
+                </div>
+            </div>
+
+            <div id="hourlyUploadZone" class="bg-white p-8 md:p-12 rounded-2xl shadow-sm border border-gray-200 text-center mb-6">
+                <div id="dropZoneHourly" class="upload-area border-2 border-dashed border-gray-300 rounded-2xl p-12 cursor-pointer relative hover:bg-gray-50 hover:border-orange-300 group">
+                    <input type="file" id="fileInputHourly" accept=".xlsx, .xls, .csv" multiple class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" onchange="window.handleGlobalFiles(this.files)">
+                    <div class="w-20 h-20 bg-orange-50 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-300"><i class="fas fa-cloud-upload-alt text-themeOrange text-4xl"></i></div>
+                    <h2 class="text-xl font-bold text-gray-700 mb-2">ระบบกำลังดึงข้อมูลอัตโนมัติ หรือ ลากไฟล์มาวางที่นี่</h2>
+                    <p class="text-gray-500 text-sm mb-4">รองรับไฟล์ "ยอดขายตามสินค้ารายชั่วโมง" (.xlsx, .csv)</p>
+                </div>
+            </div>
+
+            <div id="hourlyDashboard" class="hidden fade-in">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-lg font-bold text-gray-700" id="dashboardTitleBranch">สรุปข้อมูล: รวมทุกสาขา</h2>
+                    <button onclick="resetHourlyDashboard()" class="bg-white border border-gray-300 text-gray-600 hover:text-red-600 hover:bg-red-50 px-4 py-2 rounded-lg text-sm font-semibold flex items-center transition-colors shadow-sm"><i class="fas fa-trash-alt mr-2"></i> ล้างข้อมูล</button>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-5 relative overflow-hidden group">
+                        <div class="absolute -right-4 -top-4 text-orange-50 opacity-50 group-hover:scale-110 transition-transform"><i class="fas fa-clock text-9xl"></i></div>
+                        <div class="bg-gradient-to-br from-orange-400 to-orange-600 w-14 h-14 rounded-2xl flex items-center justify-center text-white shadow-lg z-10 shrink-0"><i class="fas fa-sun text-2xl"></i></div>
+                        <div class="z-10"><p class="text-sm text-gray-500 font-semibold mb-1">Golden Hour</p><h3 id="cardGoldenHour" class="text-2xl font-black text-gray-800 tracking-tight">-</h3><p class="text-xs text-orange-600 font-medium mt-1">เวลาที่ยอดขายสุทธิสูงสุด</p></div>
+                    </div>
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-5 relative overflow-hidden group">
+                        <div class="absolute -right-4 -top-4 text-blue-50 opacity-50 group-hover:scale-110 transition-transform"><i class="fas fa-star text-9xl"></i></div>
+                        <div class="bg-gradient-to-br from-blue-400 to-blue-600 w-14 h-14 rounded-2xl flex items-center justify-center text-white shadow-lg z-10 shrink-0"><i class="fas fa-award text-2xl"></i></div>
+                        <div class="z-10 overflow-hidden"><p class="text-sm text-gray-500 font-semibold mb-1">Top Category</p><h3 id="cardTopCat" class="text-xl font-black text-gray-800 tracking-tight truncate w-full">-</h3><p class="text-xs text-blue-600 font-medium mt-1">หมวดที่ทำเงินได้เยอะที่สุด</p></div>
+                    </div>
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-5 relative overflow-hidden group">
+                        <div class="absolute -right-4 -top-4 text-green-50 opacity-50 group-hover:scale-110 transition-transform"><i class="fas fa-chart-pie text-9xl"></i></div>
+                        <div class="bg-gradient-to-br from-green-400 to-green-600 w-14 h-14 rounded-2xl flex items-center justify-center text-white shadow-lg z-10 shrink-0"><i class="fas fa-coins text-2xl"></i></div>
+                        <div class="z-10"><p class="text-sm text-gray-500 font-semibold mb-1">Total Sales</p><h3 id="cardTotalValue" class="text-2xl font-black text-gray-800 tracking-tight">0.00</h3><p class="text-xs text-green-600 font-medium mt-1">ยอดขายรวม (บาท)</p></div>
+                    </div>
+                </div>
+
+                <div class="bg-white p-2 md:p-6 rounded-2xl shadow-sm border border-gray-200 mb-6">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-4 ml-2 sm:ml-4 mt-2 pr-2 sm:pr-4 gap-3">
+                        <div class="flex flex-wrap items-center gap-3">
+                            <div class="flex items-center gap-2"><i class="fas fa-th text-themeOrange text-lg"></i><h3 class="text-base sm:text-lg font-bold text-gray-800">Heat Map: ความหนาแน่นยอดขาย</h3></div>
+                            <div class="relative">
+                                <button id="heatmapFilterBtn" onclick="toggleHeatmapFilter()" class="bg-white border border-gray-300 text-gray-700 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-orange-50 transition-colors shadow-sm"><i class="fas fa-filter text-orange-500 mr-2"></i> กรองหมวด (<span id="heatmapFilterCount">0</span>)</button>
+                                <div id="heatmapFilterDropdown" class="hidden absolute left-0 mt-2 w-64 bg-white border border-gray-200 rounded-xl shadow-xl z-[60] overflow-hidden">
+                                    <div class="p-3 border-b border-gray-100 flex justify-between items-center bg-gray-50"><span class="text-xs font-bold text-gray-700">เลือกหมวดหมู่</span><div class="flex items-center gap-2"><button onclick="selectAllHeatmapCategories()" class="text-xs text-blue-600 font-semibold">เลือกทั้งหมด</button><span class="text-gray-300">|</span><button onclick="clearAllHeatmapCategories()" class="text-xs text-red-600 font-semibold">ล้างทั้งหมด</button></div></div>
+                                    <div id="heatmapFilterList" class="p-2 flex flex-col gap-1 max-h-64 overflow-y-auto custom-scrollbar"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <span class="bg-gray-100 text-gray-600 text-xs px-2.5 py-1.5 rounded-lg font-medium border border-gray-200 shadow-sm shrink-0" id="heatmapTimeRangeInfo">แสดงเวลา: -</span>
+                    </div>
+                    <div class="w-full custom-scrollbar overflow-x-auto overflow-y-auto" style="max-height: 800px;"><div id="heatmapContainer" class="w-full min-h-[400px]"></div></div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                    <div class="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-gray-200 lg:col-span-1">
+                        <div class="flex items-center gap-2 mb-4"><i class="fas fa-clock text-blue-500"></i><h3 class="text-lg font-bold text-gray-800">สัดส่วนรายได้ตามช่วงเวลา</h3></div>
+                        <div class="relative h-64 w-full"><canvas id="timeBlockChart"></canvas></div>
+                    </div>
+                    <div class="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-gray-200 lg:col-span-2">
+                        <div class="flex items-center gap-2 mb-4"><i class="fas fa-chart-column text-indigo-500"></i><h3 class="text-lg font-bold text-gray-800">เทรนด์ยอดขาย Top 5 หมวดสินค้า (บาท)</h3></div>
+                        <div class="relative h-64 md:h-72 w-full"><canvas id="topCategoriesTrendChart"></canvas></div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -694,7 +794,7 @@
         }
 
         function switchGlobalTab(tabId) {
-            ['mendori', 'foodstory', 'void', 'custom-dash'].forEach(id => {
+            ['mendori', 'foodstory', 'void', 'custom-dash', 'hourly'].forEach(id => {
                 const wrapper = document.getElementById(`${id}-wrapper`);
                 if (wrapper) {
                     if (id === tabId) { wrapper.classList.remove('hidden'); wrapper.classList.add('block'); } 
@@ -702,7 +802,7 @@
                 }
             });
 
-            ['btn-mendori', 'btn-foodstory', 'btn-void', 'btn-custom-dash'].forEach(id => {
+            ['btn-mendori', 'btn-foodstory', 'btn-void', 'btn-custom-dash', 'btn-hourly'].forEach(id => {
                 const btn = document.getElementById(id);
                 if (btn) btn.className = "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-4 px-1 border-b-2 font-bold text-base flex items-center gap-2 transition-colors";
             });
@@ -711,6 +811,7 @@
             else if(tabId === 'foodstory') { document.getElementById('btn-foodstory').className = "border-blue-500 text-blue-600 whitespace-nowrap py-4 px-1 border-b-2 font-bold text-base flex items-center gap-2 transition-colors"; } 
             else if(tabId === 'void') { document.getElementById('btn-void').className = "border-red-500 text-red-600 whitespace-nowrap py-4 px-1 border-b-2 font-bold text-base flex items-center gap-2 transition-colors"; }
             else if(tabId === 'custom-dash') { document.getElementById('btn-custom-dash').className = "border-purple-500 text-purple-600 whitespace-nowrap py-4 px-1 border-b-2 font-bold text-base flex items-center gap-2 transition-colors"; }
+            else if(tabId === 'hourly') { document.getElementById('btn-hourly').className = "border-pink-500 text-pink-600 whitespace-nowrap py-4 px-1 border-b-2 font-bold text-base flex items-center gap-2 transition-colors"; }
         }
 
         function normalizeDatasets() {
@@ -2606,7 +2707,6 @@
                 if (isFirstOfDay) { trClass = "hover:bg-gray-50 transition-colors duration-150 border-b border-gray-200 border-t-[3px] border-t-themeOrange"; currentDate = item.date; }
                 
                 rowsHtml += `<tr class="${trClass}">`;
-                rowsHtml += `<td class="px-6 py-4 text-xs font-bold text-gray-600 whitespace-nowrap border-r border-gray-200">${item.branch}</td>`;
                 if (isFirstOfDay) { rowsHtml += `<td rowspan="${dateRowSpans[item.date]}" class="px-6 py-4 font-semibold text-themeOrange whitespace-nowrap bg-gray-50 border-r border-gray-200">${item.date}</td>`; }
                 
                 rowsHtml += `<td class="px-6 py-4 text-gray-700 whitespace-nowrap border-l border-gray-200">${item.person}</td>
@@ -2616,6 +2716,7 @@
                              <td class="px-6 py-4 text-center border-l border-gray-200">${item.cancel > 0 ? `<span class="bg-red-100 text-red-600 px-2 py-1 rounded-full text-xs font-bold">${item.cancel}</span>` : '<span class="text-gray-300">-</span>'}</td>
                              <td class="px-6 py-4 text-center border-l border-gray-200">${item.void > 0 ? `<span class="bg-yellow-100 text-yellow-700 px-2 py-1 rounded-full text-xs font-bold">${item.void}</span>` : '<span class="text-gray-300">-</span>'}</td>
                              <td class="px-6 py-4 text-right border-l border-gray-200 font-semibold text-red-500">${item.value > 0 ? item.value.toLocaleString(undefined, {minimumFractionDigits: 2}) : '-'}</td>
+                             <td class="px-6 py-4 text-xs font-bold text-gray-600 whitespace-nowrap border-l border-gray-200 text-center">${item.branch}</td>
                          </tr>`;
             });
 
@@ -2667,10 +2768,11 @@
 
                 const wb = new ExcelJS.Workbook(); const ws = wb.addWorksheet('Cancel and Void Report', { views: [{ showGridLines: false }] });
                 ws.columns = [
-                    { header: 'สาขา', key: 'branch', width: 20 }, { header: 'วันที่เปิดบิล', key: 'date', width: 15 },
-                    { header: 'ยกเลิกโดย', key: 'person', width: 25 }, { header: 'เวลาที่ยกเลิก', key: 'time', width: 15 },
-                    { header: 'ชื่อสินค้า', key: 'product', width: 35 }, { header: 'หมายเหตุ', key: 'remark', width: 30 },
-                    { header: 'Cancel', key: 'cancel', width: 10 }, { header: 'Void', key: 'void', width: 10 }, { header: 'มูลค่า (บาท)', key: 'value', width: 15 }
+                    { header: 'วันที่เปิดบิล', key: 'date', width: 15 }, { header: 'ยกเลิกโดย', key: 'person', width: 25 }, 
+                    { header: 'เวลาที่ยกเลิก', key: 'time', width: 15 }, { header: 'ชื่อสินค้า', key: 'product', width: 35 }, 
+                    { header: 'หมายเหตุ', key: 'remark', width: 30 }, { header: 'Cancel', key: 'cancel', width: 10 }, 
+                    { header: 'Void', key: 'void', width: 10 }, { header: 'มูลค่า (บาท)', key: 'value', width: 15 }, 
+                    { header: 'สาขา', key: 'branch', width: 20 }
                 ];
 
                 const headerRow = ws.getRow(1);
@@ -2695,7 +2797,7 @@
                 const sumRow = ws.addRow({ branch: 'Grand Total', date: '', person: '', time: '', product: '', remark: '', cancel: window.globalVoidTotals.cancel, void: window.globalVoidTotals.void, value: window.globalVoidTotals.value });
                 sumRow.eachCell(c => { c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3F4F6' } }; c.font = { bold: true }; });
                 sumRow.getCell('value').numFmt = '#,##0.00'; sumRow.getCell('value').font = { color: { argb: 'FFDC2626' }, bold: true };
-                ws.mergeCells(`A${sumRow.number}:F${sumRow.number}`); sumRow.getCell(1).alignment = { horizontal: 'right' };
+                ws.mergeCells(`A${sumRow.number}:E${sumRow.number}`); sumRow.getCell(1).alignment = { horizontal: 'right' };
 
                 const buffer = await wb.xlsx.writeBuffer(); const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
                 const url = window.URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url;
@@ -2713,6 +2815,338 @@
         };
         
         window.processVoidData = processVoidData;
+    </script>
+
+    <!-- ========================================================= -->
+    <!-- HOURLY REPORT JAVASCRIPT LOGIC (TAB 5)                     -->
+    <!-- ========================================================= -->
+    <script>
+        let masterHourlyData = {}; 
+        const hoursList = ['00:00', '01:00', '02:00', '03:00', '04:00', '05:00', '06:00', '07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00', '22:00', '23:00'];
+        
+        let blockChartInst = null; let trendChartInst = null; let heatmapInst = null;
+        let isHourlyProcessing = false;
+        let hourlyAggregatedData = {}; let hourlyValidCategories = []; let selectedHeatmapCategories = new Set();
+        
+        window._hourlyForceFilterReset = true;
+        window.allAvailableMonths = new Set();
+        window.currentSelectedMonth = '';
+
+        // 1. เชื่อมโยงระบบสาขากับไฟล์หลัก
+        window.addEventListener('branchChanged', () => {
+            if (Object.keys(masterHourlyData).length > 0) { window._hourlyForceFilterReset = true; renderHourlyDashboard(); }
+        });
+
+        function handleLocalBranchChange(branchName) {
+            window.currentSelectedBranch = branchName;
+            if(typeof changeGlobalBranch === 'function') { document.getElementById('globalBranchSelect').value = branchName; changeGlobalBranch(branchName); } 
+            else { window._hourlyForceFilterReset = true; renderHourlyDashboard(); }
+        }
+
+        function handleLocalMonthChange(monthName) {
+            window.currentSelectedMonth = monthName; window._hourlyForceFilterReset = true; renderHourlyDashboard();
+        }
+
+        function updateHourlyDropdowns() {
+            const selectMonth = document.getElementById('localMonthSelect');
+            const containerMonth = document.getElementById('localMonthFilterContainer');
+            if (window.allAvailableMonths.size > 0) {
+                containerMonth.classList.remove('hidden'); selectMonth.innerHTML = '';
+                const thMonthOrder = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
+                Array.from(window.allAvailableMonths).sort((a, b) => {
+                    const [mA, yA] = a.split(' '); const [mB, yB] = b.split(' ');
+                    if (yA !== yB) return (parseInt(yA)||0) - (parseInt(yB)||0);
+                    return thMonthOrder.indexOf(mA) - thMonthOrder.indexOf(mB);
+                }).forEach(m => {
+                    const opt = document.createElement('option'); opt.value = m; opt.textContent = m;
+                    if (window.currentSelectedMonth === m) opt.selected = true;
+                    selectMonth.appendChild(opt);
+                });
+            } else { containerMonth.classList.add('hidden'); }
+
+            const selectBranch = document.getElementById('localBranchSelect');
+            const containerBranch = document.getElementById('localBranchFilterContainer');
+            if (window.allAvailableBranches.size > 1) {
+                containerBranch.classList.remove('hidden'); selectBranch.innerHTML = '';
+                const optAll = document.createElement('option'); optAll.value = 'รวมทุกสาขา'; optAll.textContent = 'รวมทุกสาขา';
+                if (window.currentSelectedBranch === 'รวมทุกสาขา') optAll.selected = true; selectBranch.appendChild(optAll);
+                Array.from(window.allAvailableBranches).sort().forEach(b => {
+                    if (b === 'รวมทุกสาขา' || b === 'ไม่ระบุสาขา') return;
+                    const opt = document.createElement('option'); opt.value = b; opt.textContent = b;
+                    if (window.currentSelectedBranch === b) opt.selected = true; selectBranch.appendChild(opt);
+                });
+            } else { containerBranch.classList.add('hidden'); }
+        }
+
+        // 2. ระบบประมวลผลไฟล์ (ดักจับไฟล์ที่ชื่อว่า hour)
+        const origHandleGlobalFiles = window.handleGlobalFiles;
+        window.handleGlobalFiles = async function(files) {
+            let hourlyFiles = [], otherFiles = [];
+            for(let i=0; i<files.length; i++) {
+                if(files[i].name.toLowerCase().includes('hour')) hourlyFiles.push(files[i]);
+                else otherFiles.push(files[i]);
+            }
+            if(hourlyFiles.length > 0) processHourlyFiles(hourlyFiles);
+            if(origHandleGlobalFiles && otherFiles.length > 0) await origHandleGlobalFiles(otherFiles);
+        };
+
+        async function processHourlyFiles(files) {
+            if(isHourlyProcessing) return;
+            isHourlyProcessing = true;
+            try {
+                for (let file of files) {
+                    const arrayBuffer = await file.arrayBuffer();
+                    parseHourlyExcelData(arrayBuffer, file.name);
+                }
+                window._hourlyForceFilterReset = true; updateHourlyDropdowns(); renderHourlyDashboard();
+                if(typeof showToast === 'function') showToast([`• Hourly Report: อ่านข้อมูลสำเร็จ ${files.length} ไฟล์`]);
+            } catch (error) { console.error("Error processing hourly files:", error); } 
+            finally { isHourlyProcessing = false; }
+        }
+
+        function extractHourlyMonthFromFilename(filename) {
+            if (!filename) return "ไม่ระบุเดือน";
+            const lowerName = filename.toLowerCase();
+            const thMonths = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
+            const enMonths = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+            let mIndex = -1;
+            let yearMatch = lowerName.match(/(20\d{2}|25\d{2})/);
+            let year = yearMatch ? yearMatch[1] : new Date().getFullYear();
+            const numMatch = lowerName.match(/hour-(\d{1,2})/);
+            if (numMatch) { mIndex = parseInt(numMatch[1], 10) - 1; } 
+            else { for (let i=0; i<enMonths.length; i++) { if (lowerName.includes(enMonths[i]) || lowerName.includes(thMonths[i])) { mIndex = i; break; } } }
+            if (mIndex >= 0 && mIndex <= 11) return `${thMonths[mIndex]} ${year}`;
+            return filename.split('.').slice(0, -1).join('.') || filename;
+        }
+
+        function parseHourlyExcelData(buffer, filename = '') {
+            try {
+                const workbook = XLSX.read(buffer, { type: 'array' });
+                if (!workbook.SheetNames || workbook.SheetNames.length === 0) return;
+                const rawData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1, defval: '' });
+                let monthName = extractHourlyMonthFromFilename(filename);
+                window.allAvailableMonths.add(monthName);
+                if (!window.currentSelectedMonth) window.currentSelectedMonth = monthName;
+
+                let headerIdx = -1, catColIdx = -1, qtyColIdx = -1, grossColIdx = -1, discountColIdx = -1, branchColIdx = -1;
+                let timeCols = {};
+
+                for (let i = 0; i < Math.min(10, rawData.length); i++) {
+                    let rowStr = rawData[i].join('').replace(/\s/g, '').toLowerCase();
+                    if (rowStr.includes('หมวดสินค้า') && rowStr.includes('00:00')) {
+                        headerIdx = i;
+                        rawData[i].forEach((col, idx) => {
+                            if (!col) return;
+                            let colName = col.toString().trim(), colNameLower = colName.toLowerCase().replace(/\s/g, '');
+                            if (colName === 'หมวดสินค้า') catColIdx = idx;
+                            if (colNameLower.includes('จำนวนการขาย') || colNameLower === 'qty') qtyColIdx = idx;
+                            if (colNameLower.includes('ยอดก่อนลด') || colNameLower.includes('ยอดรวม') || colNameLower === 'total') grossColIdx = idx;
+                            if (colNameLower.includes('ส่วนลดสินค้า') || colNameLower.includes('ส่วนลด') || colNameLower === 'discount') discountColIdx = idx;
+                            if (colNameLower.includes('สาขา') || colNameLower === 'branch') branchColIdx = idx;
+                            if (hoursList.includes(colName)) timeCols[colName] = idx;
+                        });
+                        break;
+                    }
+                }
+                if (headerIdx === -1 || catColIdx === -1) return;
+
+                for (let i = headerIdx + 1; i < rawData.length; i++) {
+                    let row = rawData[i];
+                    if (!row || !row[catColIdx]) continue;
+                    let catName = row[catColIdx].toString().trim();
+                    if (catName === '' || catName.includes('รวม') || catName.toLowerCase() === 'total') continue;
+                    let branchName = (branchColIdx !== -1 && row[branchColIdx]) ? row[branchColIdx].toString().trim() : 'ไม่ระบุสาขา';
+                    if (branchName) window.allAvailableBranches.add(branchName);
+
+                    let totalQty = qtyColIdx !== -1 && row[qtyColIdx] !== undefined ? (parseFloat(row[qtyColIdx].toString().replace(/,/g, '')) || 0) : 0;
+                    let grossSales = grossColIdx !== -1 && row[grossColIdx] !== undefined ? (parseFloat(row[grossColIdx].toString().replace(/,/g, '')) || 0) : 0;
+                    let discount = discountColIdx !== -1 && row[discountColIdx] !== undefined ? (parseFloat(row[discountColIdx].toString().replace(/,/g, '')) || 0) : 0;
+                    let unitPrice = totalQty > 0 ? ((grossSales - discount) / totalQty) : 0;
+
+                    if (!masterHourlyData[monthName]) masterHourlyData[monthName] = {};
+                    if (!masterHourlyData[monthName][branchName]) masterHourlyData[monthName][branchName] = {};
+                    if (!masterHourlyData[monthName][branchName][catName]) {
+                        masterHourlyData[monthName][branchName][catName] = {}; hoursList.forEach(h => masterHourlyData[monthName][branchName][catName][h] = 0);
+                    }
+                    hoursList.forEach(h => {
+                        let cIdx = timeCols[h];
+                        if (cIdx !== undefined && row[cIdx] !== undefined) {
+                            let hourlyQty = parseFloat(row[cIdx].toString().replace(/,/g, '')) || 0;
+                            masterHourlyData[monthName][branchName][catName][h] += ((qtyColIdx !== -1 && grossColIdx !== -1) ? (hourlyQty * unitPrice) : hourlyQty);
+                        }
+                    });
+                }
+            } catch (error) { console.error("Hourly Parse Error:", error); }
+        }
+
+        // 3. ระบบวาดกราฟและการแสดงผล UI
+        function renderHourlyDashboard() {
+            if (typeof Highcharts === 'undefined' || typeof Chart === 'undefined') { setTimeout(renderHourlyDashboard, 500); return; }
+            if (Object.keys(masterHourlyData).length === 0) return;
+
+            document.getElementById('hourlyUploadZone').classList.add('hidden');
+            document.getElementById('hourlyDashboard').classList.remove('hidden');
+            document.getElementById('dashboardTitleBranch').innerHTML = `สรุปข้อมูล: <span class="text-orange-600">${window.currentSelectedMonth}</span> <span class="text-gray-400 text-sm mx-2">|</span> สาขา: <span class="text-blue-600">${window.currentSelectedBranch}</span>`;
+
+            hourlyAggregatedData = {};
+            const monthData = masterHourlyData[window.currentSelectedMonth] || {};
+            const branchesToProcess = (window.currentSelectedBranch === 'รวมทุกสาขา') ? Object.keys(monthData) : [window.currentSelectedBranch];
+
+            branchesToProcess.forEach(branch => {
+                if (!monthData[branch]) return;
+                Object.keys(monthData[branch]).forEach(cat => {
+                    if (!hourlyAggregatedData[cat]) { hourlyAggregatedData[cat] = {}; hoursList.forEach(h => hourlyAggregatedData[cat][h] = 0); }
+                    hoursList.forEach(h => { hourlyAggregatedData[cat][h] += monthData[branch][cat][h]; });
+                });
+            });
+
+            hourlyValidCategories = []; let catTotalData = {};
+            Object.keys(hourlyAggregatedData).forEach(cat => {
+                let catSum = 0; hoursList.forEach(h => { catSum += hourlyAggregatedData[cat][h]; });
+                if (catSum > 0) { hourlyValidCategories.push(cat); catTotalData[cat] = catSum; }
+            });
+            hourlyValidCategories.sort((a, b) => catTotalData[b] - catTotalData[a]);
+
+            if (hourlyValidCategories.length === 0) {
+                document.getElementById('heatmapContainer').innerHTML = `<div class="flex items-center justify-center h-full text-gray-400 font-semibold"><i class="fas fa-info-circle text-2xl mr-2"></i> ไม่มีข้อมูลยอดขายสำหรับสาขานี้</div>`; return;
+            }
+
+            let globalTrafficDataRaw = Array(24).fill(0);
+            hourlyValidCategories.forEach(cat => { hoursList.forEach((hour, idx) => { globalTrafficDataRaw[idx] += hourlyAggregatedData[cat][hour]; }); });
+
+            let gFirst = 23, gLast = 0;
+            globalTrafficDataRaw.forEach((val, idx) => { if (val > 0) { if (idx < gFirst) gFirst = idx; if (idx > gLast) gLast = idx; } });
+            let gStartIdx = Math.max(0, gFirst - 1), gEndIdx = Math.min(23, gLast + 1);
+            if (gFirst > gLast) { gStartIdx = 0; gEndIdx = 23; }
+            let globalDisplayHours = hoursList.slice(gStartIdx, gEndIdx + 1);
+
+            let grandTotalValue = globalTrafficDataRaw.reduce((a, b) => a + b, 0);
+            let maxTraffic = -1, bestDisplayHourIdx = 0;
+            globalDisplayHours.forEach((hour) => { 
+                let originalIdx = hoursList.indexOf(hour);
+                if (globalTrafficDataRaw[originalIdx] > maxTraffic) { maxTraffic = globalTrafficDataRaw[originalIdx]; bestDisplayHourIdx = originalIdx; } 
+            });
+
+            document.getElementById('cardGoldenHour').textContent = hoursList[bestDisplayHourIdx];
+            document.getElementById('cardTopCat').textContent = hourlyValidCategories[0];
+            document.getElementById('cardTopCat').title = hourlyValidCategories[0];
+            document.getElementById('cardTotalValue').textContent = grandTotalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+
+            if (blockChartInst) blockChartInst.destroy();
+            const ctxBlock = document.getElementById('timeBlockChart').getContext('2d');
+            let timeBlocks = { 'เช้า (06-11)': { val: 0, color: '#34d399', hrs: [6,7,8,9,10] }, 'กลางวัน (11-14)': { val: 0, color: '#fbbf24', hrs: [11,12,13] }, 'บ่าย (14-17)': { val: 0, color: '#f87171', hrs: [14,15,16] }, 'เย็น/ค่ำ (17-22)': { val: 0, color: '#818cf8', hrs: [17,18,19,20,21] }, 'ดึก (22-06)': { val: 0, color: '#9ca3af', hrs: [22,23,0,1,2,3,4,5] } };
+            globalTrafficDataRaw.forEach((val, idx) => { for (let key in timeBlocks) { if (timeBlocks[key].hrs.includes(idx)) { timeBlocks[key].val += val; break; } } });
+
+            const blockLabels = Object.keys(timeBlocks).filter(k => timeBlocks[k].val > 0);
+            blockChartInst = new Chart(ctxBlock, {
+                type: 'doughnut',
+                data: { labels: blockLabels, datasets: [{ data: blockLabels.map(k => timeBlocks[k].val), backgroundColor: blockLabels.map(k => timeBlocks[k].color), borderWidth: 2, borderColor: '#ffffff' }] },
+                options: { responsive: true, maintainAspectRatio: false, cutout: '65%', plugins: { legend: { position: 'right' } } }
+            });
+
+            if (trendChartInst) trendChartInst.destroy();
+            const ctxTrend = document.getElementById('topCategoriesTrendChart').getContext('2d');
+            let datasetsForChart = [];
+            hourlyValidCategories.slice(0, 5).forEach((cat, i) => {
+                datasetsForChart.push({ label: cat, data: globalDisplayHours.map(h => hourlyAggregatedData[cat][h] || 0), backgroundColor: ['#F59E0B', '#3B82F6', '#10B981', '#EC4899', '#8B5CF6'][i], stack: 'Stack 0' });
+            });
+            if (hourlyValidCategories.length > 5) {
+                datasetsForChart.push({ label: 'อื่นๆ', data: globalDisplayHours.map(h => hourlyValidCategories.slice(5).reduce((sum, cat) => sum + (hourlyAggregatedData[cat][h] || 0), 0)), backgroundColor: '#D1D5DB', stack: 'Stack 0' });
+            }
+
+            trendChartInst = new Chart(ctxTrend, {
+                type: 'bar', data: { labels: globalDisplayHours, datasets: datasetsForChart },
+                options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, scales: { x: { stacked: true }, y: { stacked: true } } }
+            });
+
+            if (window._hourlyForceFilterReset || selectedHeatmapCategories.size === 0) {
+                selectedHeatmapCategories = new Set(hourlyValidCategories); window._hourlyForceFilterReset = false;
+            } else {
+                for (let c of selectedHeatmapCategories) { if (!hourlyValidCategories.includes(c)) selectedHeatmapCategories.delete(c); }
+                if (selectedHeatmapCategories.size === 0 && hourlyValidCategories.length > 0) selectedHeatmapCategories = new Set(hourlyValidCategories);
+            }
+            updateHeatmapFilterUI(); renderHeatmap();
+        }
+
+        // 4. ระบบกรองหมวดหมู่และวาด Heatmap
+        function renderHeatmap() {
+            let displayCategories = hourlyValidCategories.filter(cat => selectedHeatmapCategories.has(cat));
+            if (displayCategories.length === 0) {
+                document.getElementById('heatmapContainer').innerHTML = `<div class="flex items-center justify-center h-full text-gray-400 font-semibold"><i class="fas fa-filter text-2xl mr-2"></i> กรุณาเลือกหมวดหมู่อย่างน้อย 1 รายการเพื่อแสดงผล</div>`;
+                document.getElementById('heatmapContainer').style.height = '300px'; document.getElementById('heatmapTimeRangeInfo').textContent = `แสดงเวลา: -`; return;
+            }
+
+            let trafficDataRaw = Array(24).fill(0);
+            displayCategories.forEach(cat => { hoursList.forEach((hour, idx) => { trafficDataRaw[idx] += hourlyAggregatedData[cat][hour]; }); });
+
+            let firstIdx = 23, lastIdx = 0;
+            trafficDataRaw.forEach((val, idx) => { if (val > 0) { if (idx < firstIdx) firstIdx = idx; if (idx > lastIdx) lastIdx = idx; } });
+            let startIdx = Math.max(0, firstIdx - 1), endIdx = Math.min(23, lastIdx + 1);
+            if (firstIdx > lastIdx) { startIdx = 0; endIdx = 23; } 
+            let displayHours = hoursList.slice(startIdx, endIdx + 1);
+            document.getElementById('heatmapTimeRangeInfo').textContent = `แสดงเวลา: ${displayHours[0]} - ${displayHours[displayHours.length-1]}`;
+
+            let heatmapData = [];
+            const chartHeight = Math.max(250, displayCategories.length * 36); 
+            document.getElementById('heatmapContainer').style.height = `${chartHeight}px`;
+
+            displayCategories.forEach((cat, yIdx) => {
+                displayHours.forEach((hour, displayXIdx) => { heatmapData.push([displayXIdx, yIdx, parseFloat(hourlyAggregatedData[cat][hour].toFixed(2))]); });
+            });
+
+            if (heatmapInst) heatmapInst.destroy();
+            heatmapInst = Highcharts.chart('heatmapContainer', {
+                chart: { type: 'heatmap', style: { fontFamily: '"Prompt", sans-serif' }, backgroundColor: 'transparent' },
+                title: { text: null }, xAxis: { categories: displayHours, labels: { rotation: -45, style: { fontSize: '11px', color: '#6B7280' } } },
+                yAxis: { categories: displayCategories, title: null, reversed: true, labels: { style: { fontSize: '11px' } } },
+                colorAxis: { min: 0, stops: [[0, '#F9FAFB'], [0.05, '#FFF3E0'], [0.4, '#FFB74D'], [0.7, '#F57C00'], [1, '#D84315']] },
+                legend: { align: 'right', layout: 'vertical', margin: 15, symbolHeight: Math.min(250, chartHeight - 80) },
+                series: [{
+                    name: 'ยอดขาย (บาท)', borderWidth: 1, borderColor: '#F3F4F6', data: heatmapData,
+                    dataLabels: { enabled: true, color: '#000000', style: { textOutline: 'none', fontSize: '10px' }, formatter: function() { return this.point.value > 0 ? (this.point.value >= 1000 ? (this.point.value/1000).toFixed(1)+'k' : this.point.value.toLocaleString(undefined, {maximumFractionDigits: 0})) : ''; } }
+                }], credits: { enabled: false }
+            });
+        }
+
+        function toggleHeatmapFilter() { document.getElementById('heatmapFilterDropdown').classList.toggle('hidden'); }
+        function updateHeatmapFilterUI() {
+            const list = document.getElementById('heatmapFilterList'); const countSpan = document.getElementById('heatmapFilterCount');
+            list.innerHTML = '';
+            hourlyValidCategories.forEach(cat => {
+                list.innerHTML += `<label class="flex items-center p-2 hover:bg-orange-50 rounded-lg cursor-pointer">
+                    <input type="checkbox" value="${cat}" ${selectedHeatmapCategories.has(cat) ? 'checked' : ''} onchange="handleHeatmapFilterChange(this)" class="w-4 h-4 text-orange-600 rounded">
+                    <span class="ml-3 text-sm font-medium text-gray-700 truncate">${cat}</span></label>`;
+            });
+            countSpan.textContent = `${selectedHeatmapCategories.size}/${hourlyValidCategories.length}`;
+        }
+        function handleHeatmapFilterChange(cb) { if (cb.checked) selectedHeatmapCategories.add(cb.value); else selectedHeatmapCategories.delete(cb.value); updateHeatmapFilterUI(); renderHeatmap(); }
+        function selectAllHeatmapCategories() { selectedHeatmapCategories = new Set(hourlyValidCategories); updateHeatmapFilterUI(); renderHeatmap(); }
+        function clearAllHeatmapCategories() { selectedHeatmapCategories.clear(); updateHeatmapFilterUI(); renderHeatmap(); }
+
+        function resetHourlyDashboard() {
+            masterHourlyData = {}; window.allAvailableMonths = new Set(); window.currentSelectedMonth = '';
+            updateHourlyDropdowns(); if (blockChartInst) blockChartInst.destroy(); if (trendChartInst) trendChartInst.destroy(); if (heatmapInst) heatmapInst.destroy();
+            document.getElementById('hourlyDashboard').classList.add('hidden'); document.getElementById('hourlyUploadZone').classList.remove('hidden');
+        }
+
+        // 5. โหลดไฟล์อัตโนมัติ
+        window.addEventListener('DOMContentLoaded', async () => {
+            const baseUrl = './data/hour-'; let successCount = 0; const currentYear = new Date().getFullYear();
+            for (let i = 1; i <= 12; i++) {
+                let monthStr = i.toString().padStart(2, '0');
+                let urlsToTry = [`${baseUrl}${monthStr}-2026.xlsx`, `${baseUrl}${monthStr}-${currentYear}.xlsx`, `${baseUrl}${monthStr}.xlsx`];
+                for (let fileUrl of urlsToTry) {
+                    try {
+                        const response = await fetch(fileUrl + '?t=' + new Date().getTime());
+                        if (response.ok) {
+                            parseHourlyExcelData(await response.arrayBuffer(), fileUrl.split('/').pop().split('?')[0]);
+                            successCount++; break;
+                        }
+                    } catch (e) {}
+                }
+            }
+            if (successCount > 0) { window._hourlyForceFilterReset = true; updateHourlyDropdowns(); renderHourlyDashboard(); }
+        });
     </script>
 </body>
 </html>
