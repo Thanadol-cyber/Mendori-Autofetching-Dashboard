@@ -2833,61 +2833,75 @@
         window.currentSelectedMonth = '';
 
         // ----------------------------------------------------
-        // Helper: ฟังก์ชันแก้ปัญหาเวลาเปิดร้านข้ามวัน (Smart Shift Time)
+        // Helper: ฟังก์ชันแกนเวลาอัจฉริยะ (รองรับเปิดข้ามวัน + เว้นช่องว่างหัวท้าย 1 ชม.)
         // ----------------------------------------------------
         function getSmartDisplayHours(trafficArray) {
-            let maxZeroLen = 0;
-            let maxZeroEndIdx = 0; 
-            
-            // 1. หาช่วงเวลาที่ยอดขายเป็น 0 ติดต่อกันยาวนานที่สุด
-            for (let start = 0; start < 24; start++) {
-                if (trafficArray[start] === 0) {
-                    let len = 0;
-                    let curr = start;
-                    while (len < 24 && trafficArray[curr] === 0) {
-                        len++;
-                        curr = (curr + 1) % 24;
-                    }
-                    if (len > maxZeroLen) {
-                        maxZeroLen = len;
-                        maxZeroEndIdx = curr;
-                    }
+            let activeHours = [];
+            trafficArray.forEach((val, idx) => {
+                if (val > 0) activeHours.push(idx);
+            });
+
+            // ถ้ายอดขายเป็น 0 หมด หรือขายเต็ม 24 ชม. ให้คืนค่าทั้งหมดไปเลย
+            if (activeHours.length === 0 || activeHours.length === 24) return hoursList;
+
+            // ถ้ามียอดขายแค่ชั่วโมงเดียว
+            if (activeHours.length === 1) {
+                let idx = activeHours[0];
+                let start = (idx - 1 + 24) % 24;
+                let end = (idx + 1) % 24;
+                return [hoursList[start], hoursList[idx], hoursList[end]];
+            }
+
+            let maxGap = 0;
+            let startOfGap = -1;
+            let endOfGap = -1;
+
+            // คำนวณหา "ช่วงเวลาที่ร้านปิดนานที่สุด"
+            for (let i = 0; i < activeHours.length; i++) {
+                let curr = activeHours[i];
+                let next = activeHours[(i + 1) % activeHours.length];
+                
+                let gap;
+                if (next > curr) {
+                    gap = next - curr - 1;
+                } else {
+                    gap = (24 - curr) + next - 1; // รองรับกรณีข้ามคืน
+                }
+
+                if (gap > maxGap) {
+                    maxGap = gap;
+                    startOfGap = curr;
+                    endOfGap = next;
                 }
             }
 
-            let startHourIdx = 0;
-            // 2. ถ้าร้านมีช่วงที่ไม่ได้ขายนานกว่า 4 ชั่วโมง ให้ถือว่าช่วงนั้นคือร้านปิด
-            // และเวลาแรกที่มีการขายหลังจากนั้น คือเวลาเปิดร้าน
-            if (maxZeroLen >= 4) {
-                startHourIdx = maxZeroEndIdx;
-            }
-
-            // 3. จัดเรียง Array ของเวลาและข้อมูลใหม่ โดยเริ่มจากเวลาเปิดร้าน
-            let shiftedHoursList = [];
-            let shiftedTrafficData = [];
-            for (let i = 0; i < 24; i++) {
-                let idx = (startHourIdx + i) % 24;
-                shiftedHoursList.push(hoursList[idx]);
-                shiftedTrafficData.push(trafficArray[idx]);
-            }
-
-            // 4. ตัดช่วงหัว-ท้ายที่ไม่มีข้อมูลทิ้ง (เผื่อเวลาหน้า-หลัง 1 ชม.)
-            let gFirst = 23, gLast = 0;
-            let hasData = false;
-            shiftedTrafficData.forEach((val, idx) => { 
-                if (val > 0) { 
-                    hasData = true;
-                    if (idx < gFirst) gFirst = idx; 
-                    if (idx > gLast) gLast = idx; 
-                } 
-            });
-
-            if (!hasData) return hoursList;
-
-            let gStartIdx = Math.max(0, gFirst - 1);
-            let gEndIdx = Math.min(23, gLast + 1);
+            let openHour, closeHour;
             
-            return shiftedHoursList.slice(gStartIdx, gEndIdx + 1);
+            // ถ้ามีช่วงเว้นว่าง >= 3 ชั่วโมง ให้ถือเป็นช่วงปิดร้าน
+            if (maxGap >= 3) {
+                openHour = endOfGap;
+                closeHour = startOfGap;
+            } else {
+                openHour = Math.min(...activeHours);
+                closeHour = Math.max(...activeHours);
+            }
+
+            // เพิ่ม Padding (เว้นว่างหัว-ท้าย 1 ชั่วโมงเสมอ)
+            let paddedOpenHour = (openHour - 1 + 24) % 24;
+            let paddedCloseHour = (closeHour + 1) % 24;
+
+            let result = [];
+            let curr = paddedOpenHour;
+            
+            let count = 0;
+            while (count < 24) {
+                result.push(hoursList[curr]);
+                if (curr === paddedCloseHour) break;
+                curr = (curr + 1) % 24;
+                count++;
+            }
+
+            return result;
         }
 
         // 1. เชื่อมโยงระบบสาขากับไฟล์หลัก
@@ -2996,20 +3010,12 @@
                         rawData[i].forEach((col, idx) => {
                             if (!col) return;
                             let colName = col.toString().trim(), colNameLower = colName.toLowerCase().replace(/\s/g, '');
-                            
-                            if (colName === 'หมวดสินค้า') {
-                                catColIdx = idx;
-                            } else if ((colNameLower.includes('จำนวนการขาย') || colNameLower === 'qty') && !colNameLower.includes('ต้นทุน') && !colNameLower.includes('กำไร')) {
-                                qtyColIdx = idx;
-                            } else if ((colNameLower.includes('ยอดก่อนลด') || colNameLower.includes('ยอดรวม') || colNameLower === 'total') && !colNameLower.includes('กำไร')) {
-                                grossColIdx = idx;
-                            } else if ((colNameLower.includes('ส่วนลดสินค้า') || colNameLower.includes('ส่วนลด') || colNameLower === 'discount') && !colNameLower.includes('กำไร')) {
-                                discountColIdx = idx;
-                            } else if (colNameLower === 'สาขา' || colNameLower === 'branch') {
-                                branchColIdx = idx;
-                            } else if (hoursList.includes(colName)) {
-                                timeCols[colName] = idx;
-                            }
+                            if (colName === 'หมวดสินค้า') catColIdx = idx;
+                            if (colNameLower.includes('จำนวนการขาย') || colNameLower === 'qty') qtyColIdx = idx;
+                            if (colNameLower.includes('ยอดก่อนลด') || colNameLower.includes('ยอดรวม') || colNameLower === 'total') grossColIdx = idx;
+                            if (colNameLower.includes('ส่วนลดสินค้า') || colNameLower.includes('ส่วนลด') || colNameLower === 'discount') discountColIdx = idx;
+                            if (colNameLower.includes('สาขา') || colNameLower === 'branch') branchColIdx = idx;
+                            if (hoursList.includes(colName)) timeCols[colName] = idx;
                         });
                         break;
                     }
