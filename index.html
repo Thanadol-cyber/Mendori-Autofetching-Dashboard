@@ -840,45 +840,66 @@
             });
         }
 
+        window.getDataManifest = function() {
+            if (!window._dataManifestPromise) {
+                window._dataManifestPromise = fetch('./data/manifest.json?t=' + new Date().getTime(), { cache: 'no-store' })
+                    .then(res => res.ok ? res.json() : null)
+                    .then(data => (data && Array.isArray(data.files) && data.files.length > 0) ? data.files : null)
+                    .catch(() => null);
+            }
+            return window._dataManifestPromise;
+        };
+
         async function fetchDefaultData() {
             const overlay = document.getElementById('globalLoadingOverlay');
             document.getElementById('loadingTitle').innerText = "กำลังค้นหาข้อมูลอัตโนมัติ...";
-            document.getElementById('loadingSub').innerText = "รอสักครู่ ระบบกำลังดึงฐานข้อมูล (ทยอยโหลดเพื่อป้องกันเซิร์ฟเวอร์บล็อก)...";
+            document.getElementById('loadingSub').innerText = "รอสักครู่ ระบบกำลังดึงฐานข้อมูล...";
             overlay.classList.remove('hidden');
             overlay.classList.add('flex');
 
-            const months = ['01','02','03','04','05','06','07','08','09','10','11','12'];
-            const years = ['2024', '2025', '2026', '2027'];
-            const exts = ['.csv', '.xlsx']; 
-            const prefix = './data/'; 
             const urlsToTry = [];
-            
-            const engTypes = ['sales', 'payment', 'category', 'void'];
-            const thTypes = ['ยอดขาย', 'การชำระเงิน', 'หมวดสินค้า', 'สถานะการสั่ง'];
+            const manifestFiles = await window.getDataManifest();
 
-            engTypes.forEach(type => {
-                months.forEach(month => {
-                    exts.forEach(ext => urlsToTry.push(`${prefix}${type}-${month}${ext}`));
+            if (manifestFiles) {
+                manifestFiles.forEach(f => {
+                    const name = f.split('/').pop().toLowerCase();
+                    if (!name.startsWith('hour') && (name.endsWith('.csv') || name.endsWith('.xlsx') || name.endsWith('.xls'))) {
+                        urlsToTry.push(f.startsWith('./') ? f : './' + f);
+                    }
                 });
-            });
+            } else {
+                const months = ['01','02','03','04','05','06','07','08','09','10','11','12'];
+                const years = ['2024', '2025', '2026', '2027'];
+                const exts = ['.csv', '.xlsx']; 
+                const prefix = './data/'; 
+                
+                const engTypes = ['sales', 'payment', 'category', 'void'];
+                const thTypes = ['ยอดขาย', 'การชำระเงิน', 'หมวดสินค้า', 'สถานะการสั่ง'];
 
-            engTypes.forEach(type => {
-                months.forEach(month => {
-                    years.forEach(year => {
-                        exts.forEach(ext => urlsToTry.push(`${prefix}${type}-${month}-${year}${ext}`));
+                engTypes.forEach(type => {
+                    months.forEach(month => {
+                        exts.forEach(ext => urlsToTry.push(`${prefix}${type}-${month}${ext}`));
                     });
                 });
-            });
 
-            thTypes.forEach(type => {
-                months.forEach(month => {
-                    exts.forEach(ext => urlsToTry.push(`${prefix}${type}-${month}${ext}`));
+                engTypes.forEach(type => {
+                    months.forEach(month => {
+                        years.forEach(year => {
+                            exts.forEach(ext => urlsToTry.push(`${prefix}${type}-${month}-${year}${ext}`));
+                        });
+                    });
                 });
-            });
 
-            urlsToTry.push(`${prefix}ยอดขายสินค้าตามวัน.csv`, `${prefix}ยอดขายสินค้าตามวัน.xlsx`);
-            urlsToTry.push(`${prefix}รายงานสถานะการสั่งสินค้า.csv`, `${prefix}รายงานสถานะการสั่งสินค้า.xlsx`);
-            urlsToTry.push(`${prefix}รายงานสรุปยอดขายแยกตามวัน (1).csv`, `${prefix}รายงานสรุปยอดขายแยกตามวัน (1).xlsx`);
+                thTypes.forEach(type => {
+                    months.forEach(month => {
+                        exts.forEach(ext => urlsToTry.push(`${prefix}${type}-${month}${ext}`));
+                    });
+                });
+
+                urlsToTry.push(`${prefix}ยอดขายสินค้าตามวัน.csv`, `${prefix}ยอดขายสินค้าตามวัน.xlsx`);
+                urlsToTry.push(`${prefix}รายงานสถานะการสั่งสินค้า.csv`, `${prefix}รายงานสถานะการสั่งสินค้า.xlsx`);
+                urlsToTry.push(`${prefix}รายงานสรุปยอดขายแยกตามวัน (1).csv`, `${prefix}รายงานสรุปยอดขายแยกตามวัน (1).xlsx`);
+            }
 
             let loadedMendori = 0, loadedCategory = 0, loadedVoid = 0;
 
@@ -3286,18 +3307,38 @@
 
         // 5. โหลดไฟล์อัตโนมัติ
         window.addEventListener('DOMContentLoaded', async () => {
-            const baseUrl = './data/hour-'; let successCount = 0; const currentYear = new Date().getFullYear();
-            for (let i = 1; i <= 12; i++) {
-                let monthStr = i.toString().padStart(2, '0');
-                let urlsToTry = [`${baseUrl}${monthStr}-2026.xlsx`, `${baseUrl}${monthStr}-${currentYear}.xlsx`, `${baseUrl}${monthStr}.xlsx`];
-                for (let fileUrl of urlsToTry) {
+            let successCount = 0;
+            const manifestFiles = (typeof window.getDataManifest === 'function') ? await window.getDataManifest() : null;
+
+            if (manifestFiles) {
+                const hourFiles = manifestFiles.filter(f => {
+                    const name = f.split('/').pop().toLowerCase();
+                    return name.startsWith('hour-') && (name.endsWith('.xlsx') || name.endsWith('.xls') || name.endsWith('.csv'));
+                }).map(f => f.startsWith('./') ? f : './' + f);
+
+                await Promise.all(hourFiles.map(async (fileUrl) => {
                     try {
-                        const response = await fetch(fileUrl + '?t=' + new Date().getTime());
+                        const response = await fetch(encodeURI(fileUrl) + '?t=' + new Date().getTime(), { cache: 'no-store' });
                         if (response.ok) {
                             parseHourlyExcelData(await response.arrayBuffer(), fileUrl.split('/').pop().split('?')[0]);
-                            successCount++; break;
+                            successCount++;
                         }
                     } catch (e) {}
+                }));
+            } else {
+                const baseUrl = './data/hour-'; const currentYear = new Date().getFullYear();
+                for (let i = 1; i <= 12; i++) {
+                    let monthStr = i.toString().padStart(2, '0');
+                    let urlsToTry = [`${baseUrl}${monthStr}-2026.xlsx`, `${baseUrl}${monthStr}-${currentYear}.xlsx`, `${baseUrl}${monthStr}.xlsx`];
+                    for (let fileUrl of urlsToTry) {
+                        try {
+                            const response = await fetch(fileUrl + '?t=' + new Date().getTime());
+                            if (response.ok) {
+                                parseHourlyExcelData(await response.arrayBuffer(), fileUrl.split('/').pop().split('?')[0]);
+                                successCount++; break;
+                            }
+                        } catch (e) {}
+                    }
                 }
             }
             if (successCount > 0) { window._hourlyForceFilterReset = true; updateHourlyDropdowns(); renderHourlyDashboard(); }
