@@ -4,9 +4,8 @@ on:
   push:
     paths:
       - 'data/**'
+      - '!data/manifest.json'
       - '.github/workflows/update-manifest.yml'
-    paths-ignore:
-      - 'data/manifest.json'
   workflow_dispatch:
 
 permissions:
