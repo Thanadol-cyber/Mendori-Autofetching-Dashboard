@@ -1,1 +1,59 @@
+name: Update Data Manifest
+
+on:
+  push:
+    paths:
+      - 'data/**'
+      - '.github/workflows/update-manifest.yml'
+    paths-ignore:
+      - 'data/manifest.json'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-manifest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Generate data/manifest.json
+        run: |
+          python3 - << 'EOF'
+          import json
+          from pathlib import Path
+          from datetime import datetime, timezone
+
+          data_dir = Path("data")
+          exts = {".csv", ".xlsx", ".xls"}
+          files = []
+          if data_dir.exists():
+              for p in sorted(data_dir.rglob("*")):
+                  if p.is_file() and not p.name.startswith(("~$", ".")) and p.suffix.lower() in exts:
+                      files.append(p.as_posix())
+
+          manifest = {
+              "generatedAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+              "count": len(files),
+              "files": files,
+          }
+          data_dir.mkdir(parents=True, exist_ok=True)
+          out = data_dir / "manifest.json"
+          out.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+          print(f"Generated {out} with {len(files)} files.")
+          EOF
+
+      - name: Commit and push manifest.json
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/manifest.json
+          if git diff --staged --quiet; then
+            echo "No changes to data/manifest.json"
+          else
+            git commit -m "chore: update data/manifest.json [skip ci]"
+            git push
+          fi
 
